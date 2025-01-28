@@ -1,14 +1,16 @@
-<script lang="ts" setup>
-import Toolbar from "~/components/shared/layout/toolbar.vue";
-import Footer from "~/components/shared/layout/footer.vue";
-import WhatsAppButton from "~/components/core/WhatsAppButton.vue";
-</script>
 <template>
-  <div>
-    <Toolbar />
-    <slot />
-    <WhatsAppButton />
+  <n-layout position="absolute">
+    <Navbar />
+    <n-layout-content class="main-content">
+      <slot />
+    </n-layout-content>
     <Footer />
-  </div>
+  </n-layout>
 </template>
-<style></style>
+
+<style>
+.main-content {
+  min-height: 100vh;
+  padding-top: 84px;
+}
+</style>

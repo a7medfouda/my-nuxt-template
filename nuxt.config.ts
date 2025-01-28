@@ -1,5 +1,6 @@
-import Components from "unplugin-vue-components/vite";
+import AutoImport from "unplugin-auto-import/vite";
 import { NaiveUiResolver } from "unplugin-vue-components/resolvers";
+import Components from "unplugin-vue-components/vite";
 
 export default defineNuxtConfig({
   compatibilityDate: "2024-11-01",
@@ -10,41 +11,36 @@ export default defineNuxtConfig({
       autoprefixer: {},
     },
   },
-  app: {
-    head: {
-      meta: [
-        { charset: "utf-8" },
-        {
-          name: "viewport",
-          content:
-            "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
-        },
-      ],
-    },
-  },
+  css: ["@/assets/styles/_base.scss"],
   runtimeConfig: {
     public: {
-      baseURL: process.env.BASE_URL,
+      BASE_URL: process.env.BASE_URL || "no url",
     },
   },
-  css: ["~~/assets/styles/_base.scss"],
   modules: [
-    "@nuxt/icon",
-    "@nuxtjs/tailwindcss",
+    "@nuxt/image",
     "@nuxtjs/i18n",
-    "nuxt-easy-lightbox",
-    "@unlazy/nuxt",
-    "nuxt-aos",
+    "@nuxt/icon",
+    "@nuxtjs/color-mode",
     "nuxt-swiper",
+    "@pinia/nuxt",
+    "nuxtjs-naive-ui",
   ],
-  ssr: false,
-  typescript: {
-    shim: false,
-  },
   vite: {
     plugins: [
+      AutoImport({
+        imports: [
+          {
+            "naive-ui": [
+              "useDialog",
+              "useMessage",
+              "useNotification",
+              "useLoadingBar",
+            ],
+          },
+        ],
+      }),
       Components({
-        dts: true,
         resolvers: [NaiveUiResolver()],
       }),
     ],

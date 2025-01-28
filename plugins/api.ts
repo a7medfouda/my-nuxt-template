@@ -1,40 +1,102 @@
-import axios, { type AxiosInstance } from "axios";
-import { useRouter } from "vue-router";
+import axios from "axios";
+import { navigateTo } from "#app";
+import { useCommonStore } from "~/stores/common";
+import { useAuthStore } from "~/stores/auth";
+
+type NotifyCtx = {
+  title: string;
+  content?: string;
+  duration?: number;
+};
 
 export default defineNuxtPlugin((nuxtApp) => {
-  const config = useRuntimeConfig();
-  const router = useRouter();
-  const baseURL = config.public.baseURL as string;
-  const locale =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("app-lang") || "en"
-      : "ar";
-  const api: AxiosInstance = axios.create({
-    baseURL: baseURL,
+  const { $pinia } = useNuxtApp();
+
+  const $axios = axios.create({
     headers: {
-      "Content-Type": "application/json",
       Accept: "application/json",
-      "Accept-Language": locale,
+      "Content-Type": "application/json",
     },
   });
 
-  const setAuthToken = (token: string) => {
-    api.defaults.headers.common["Authorization"] = "Bearer " + token;
-  };
+  const fireRequest = async (config: any) => {
+    console.log(`%c Making request to: ${config.url}`);
+    // @ts-ignore
+    const token = useCookie("_token").value?.token;
+    // Do something before request is sent
+    config.headers["Authorization"] = token ? `Bearer ${token}` : null;
+    config.headers["Accept-Language"] = useCookie("lang").value || "en";
+    // config.headers["Device-Type"] = useRuntimeConfig().public.API_SECRET;
 
-  const setLanguage = (language: string) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("app-lang", language);
-      api.defaults.headers.common["Accept-Language"] = language;
-    }
+    await nuxtApp.callHook("page:start");
+    // console.log(config, "config from middleware");
+    return config;
   };
-  api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
+  const errorResponse = async (error: any) => {
+    // @ts-ignore
+    const commonStore = useCommonStore($pinia);
+    // @ts-ignore
+    const authStore = useAuthStore($pinia);
+
+    const { notify, getErrorMsg, notifyNetworkError } = commonStore;
+
+    await nuxtApp.callHook("page:finish");
+
+    const isNetworkError = error.code === "ERR_NETWORK";
+    if (isNetworkError) {
+      notifyNetworkError(false);
       return Promise.reject(error);
     }
-  );
 
-  nuxtApp.provide("api", api);
-  nuxtApp.provide("setLanguage", setLanguage);
+    const code = parseInt(error.response && error.response.status);
+
+    const notifyMsg: NotifyCtx = {
+      title: getErrorMsg(error),
+      content: `An Error has occurred at this request: "/${error.response.config.url}" with status code: ${code}`,
+      duration: 1000000,
+    };
+
+    // 401 Unauthorized
+    if (code === 401) {
+      await authStore.clearAuth();
+      navigateTo({ name: "login" });
+    }
+    // 403 Forbidden
+    if (code === 403) {
+      notify("error", notifyMsg);
+    }
+    if (code !== 422 && code > 403 && code < 500) {
+      notify("error", notifyMsg);
+    }
+
+    if (code >= 500) {
+      navigateTo({
+        path: "/error",
+        query: {
+          code: code,
+          statusMessage: notifyMsg.title,
+          message: notifyMsg.content,
+        },
+      });
+    }
+    return Promise.reject(error);
+  };
+
+  $axios.interceptors.request.use(fireRequest);
+
+  $axios.interceptors.response.use(
+    async (response: any) => {
+      await nuxtApp.callHook("page:finish");
+      return response;
+    },
+    (error) => errorResponse(error)
+  );
+  // @ts-ignore
+  $axios.defaults.baseURL = useRuntimeConfig().public.BASE_URL;
+
+  return {
+    provide: {
+      axios: $axios,
+    },
+  };
 });

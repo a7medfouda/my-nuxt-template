@@ -1,80 +1,90 @@
 <script lang="ts" setup>
-const props = defineProps<{
-  thumbnail?: string;
-  class_styles?: string[] | string;
-  parent_class_styles?: string;
-  alt?: string;
-  place_holder?: string;
-  spiner?: string;
-}>();
+type IProps = {
+  src: string;
+  placeholder?: string;
+  alt: string;
+  lazy?: boolean;
+  variant?: "cover" | "contain";
+};
+const props = withDefaults(defineProps<IProps>(), {
+  lazy: true,
+  src: "",
+  alt: "",
+  placeholder: "/logo_mb.svg",
+  variant: "cover",
+});
 
-const isLoading = ref(true);
+async function checkImageURL(url: string) {
+  return new Promise<void>((resolve, reject) => {
+    const img = new Image();
+    img.src = url;
 
-function handleImageLoad() {
-  isLoading.value = false;
+    img.onload = () => resolve();
+    img.onerror = () => reject();
+  });
 }
 
-const placeholder = computed(() => {
-  return (
-    props.place_holder ||
-    " https://via.placeholder.com/300x300/000000/FFFFFF.png?text=Loading"
-  );
+const placeholderSrc = ref(
+  props.placeholder ? props.placeholder : "/logo_mb.svg"
+);
+const mainSrc = ref(props.src);
+
+const checkImage = async () => {
+  checkImageURL(props.src)
+    .then(() => {
+      console.log("Image loaded successfully", props.src);
+    })
+    .catch(() => {
+      console.error("Error loading the image");
+      mainSrc.value = placeholderSrc.value;
+    });
+};
+
+const style = computed(() => {
+  if (mainSrc.value === placeholderSrc.value) return { background: "#000000" };
+  return { background: "transparent" };
 });
+const img = useImage();
+
+const isImage = computed(
+  () =>
+    props.src.trim().split("").length > 0 &&
+    props.alt.trim().split("").length > 0
+);
+
+const handleError = () => {
+  console.error("IMAGE ERROR ->", props.src);
+  mainSrc.value = placeholderSrc.value;
+};
 </script>
 
 <template>
-  <div
-    :class="[
-      'image-wrapper',
-      parent_class_styles,
-      isLoading
-        ? 'pending tw-flex tw-justify-center tw-items-center'
-        : 'loaded',
-    ]"
-  >
-    <!-- Image -->
-    <img
-      :src="thumbnail || placeholder"
-      :class="[class_styles, 'image', 'tw-object-contain']"
-      :alt="alt || 'Image Placeholder'"
-      loading="lazy"
-      @load="handleImageLoad"
+  <template v-if="isImage">
+    <nuxt-img
+      :alt="alt"
+      :fit="variant"
+      :loading="lazy ? 'lazy' : 'eager'"
+      :src="mainSrc"
+      :style="{ objectFit: variant }"
+      densities="x1 x2"
+      height="100"
+      sizes="100vw sm:50vw md:400px"
+      width="100"
+      @load="checkImage"
+      @error="handleError"
     />
-
-    <!-- Placeholder Spinner -->
-    <div
-      v-if="isLoading"
-      class="spinner tw-flex tw-items-center tw-justify-center tw-h-full tw-w-full tw-absolute tw-left-0 tw-inset-y"
-    >
-      <Icon class="tw-text-black" name="svg-spinners:90-ring" size="30" />
-    </div>
-  </div>
+  </template>
+  <template v-else>
+    <nuxt-img
+      :src="'/logo_mb.svg'"
+      alt=" logo placeholder"
+      densities="x1 x2"
+      fit="cover"
+      height="50"
+      loading="lazy"
+      sizes="100vw sm:50vw md:400px"
+    />
+  </template>
 </template>
 
-<style scoped>
-.image-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-}
-
-.image-wrapper.pending {
-  display: flex;
-  align-items: center;
-}
-
-.image-wrapper.loaded .spinner {
-  display: none;
-}
-
-.image-wrapper img.image {
-  opacity: 0;
-  transform: scale(1);
-  transition: opacity 0.5s ease, transform 0.5s ease;
-}
-
-.image-wrapper.loaded img.image {
-  opacity: 1;
-}
-</style>
+<style lang="scss" scoped></style>
